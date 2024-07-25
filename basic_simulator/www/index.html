@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graphs</title>
+    <script src="https://www.desmos.com/api/v1.9/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6"></script>
+    <link rel="stylesheet" href="style/tailwind.css">
+    <link rel="shortcut icon" href="favicon.png" type="image/png">
+</head>
+
+<body class="group">
+    <div class="bg-red-500 text-white hidden group-[.error]:block" id="error">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+            class="size-6 inline">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        </svg>
+        <span>Could not connect, ensure WebSocketServer is running and reload</span>
+    </div>
+    <div class="w-[800px] h-[600px]" id="calculator"></div>
+    <div id="options">
+        <label for="xvalues">Choose x-axis values:</label>
+        <select id="xvalues">
+            <option value="time" selected>Time</option>
+            <option value="x">Position</option>
+            <option value="accel">Acceleration</option>
+            <option value="vel">Velocity</option>
+        </select>
+        <label for="yvalues">Choose y-axis values:</label>
+        <select id="yvalues">
+            <option value="time">Time</option>
+            <option value="x" selected>Position</option>
+            <option value="accel">Acceleration</option>
+            <option value="vel">Velocity</option>
+        </select>
+    </div>
+    <div id="sim_options">
+        <label for="velocity">Velocity:</label>
+        <input id="velocity" type="number">
+    </div>
+    <script>
+        const WS_PORT = 8032;
+        const el = document.getElementById("calculator");
+        const calc = Desmos.GraphingCalculator(el);
+        const values = {
+            time: [],
+            x: [],
+            accel: [],
+            vel: []
+        }
+        const currentState = {
+            xvalues: "time",
+            yvalues: "x",
+        }
+
+        const getValues = (type) => {
+            return values[currentState[type]]
+        }
+
+        const changeView = (event) => {
+            // For convenience, though one is able to change these views through Desmos's GUI (TODO: choice 1: sync, choice 2: remove from gui, choice 3: remove our gui (bad idea)
+            // Ignore Desmos's GUI for now
+            currentState[event.target.id] = event.target.value;
+        }
+
+        const updateValues = (msg) => {
+            // Recieves [values] from WebSocketServer
+            for (const [key, value] of Object.entries(msg)) {
+                values[key].push(...value)
+            }
+        }
+
+        const handleMessage = (event) => {
+            const msg = JSON.parse(event.data);
+            switch(msg.type){
+                case 'measure_velocity':
+                    velocityin.value=`${msg.value}`;
+                    break;
+                case 'data':
+                    updateValues(msg.value);
+                    break;
+            }
+        }
+
+        const xvaluein = document.getElementById("xvalues");
+        const yvaluein = document.getElementById("yvalues");
+        const client = new WebSocket(`ws://localhost:${WS_PORT}`);
+        client.addEventListener("error", function () {
+            document.body.classList.add("error");
+        })
+        client.addEventListener("message", handleMessage);
+        xvaluein.addEventListener("input", changeView);
+        yvaluein.addEventListener("input", changeView);
+        const velocityin = document.getElementById("velocity");
+        velocityin.addEventListener("change",function (event) {
+            client.send(JSON.stringify({
+                "type":"push",
+                "value":Number.parseFloat(event.target.value)
+            }))
+        })
+    </script>
+</body>
+
+</html>
