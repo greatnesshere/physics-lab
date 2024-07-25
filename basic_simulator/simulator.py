@@ -3,7 +3,6 @@ from server import MyHTTPRequestHandler
 from threading import Thread
 from queue import Queue
 from websockets.sync.server import serve
-from websockets.sync.server import WebSocketServer
 from json import loads,dumps
 
 from matter import *
@@ -27,8 +26,11 @@ def serve_web():
     Thread(target=serve_forever,args=(httpd,)).start()
     return httpd
 
+CLIENTS=set()
+
 def serve_ws():
     def handler(connection):
+        CLIENTS.add(connection)
         connection.send(dumps({
             "type":"measure_velocity",
             "value":PARTICLE_VELOCITY
